@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: radar_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: radar_user
+      POSTGRES_PASSWORD: radar_password
+      POSTGRES_DB: radar_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: radar_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: radar_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://radar_user:radar_password@postgres:5432/radar_db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: radar_frontend
+    restart: always
+    ports:
+      - "80:80"
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

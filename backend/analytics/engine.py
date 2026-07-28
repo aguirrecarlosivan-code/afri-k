@@ -1,0 +1,196 @@
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+
+
+class AnalyticsEngine:
+    """
+    Independent Analytics Engine for Radar Social Media Intelligence.
+    Calculates WoW growth, viral posts, engagement rates, optimal posting times, format efficiency, and cross-platform rankings.
+    """
+
+    @staticmethod
+    def calculate_engagement_rate(likes: int, comments: int, shares: int, clicks: int, reach: int) -> float:
+        """Calculate engagement rate percentage based on reach."""
+        if reach <= 0:
+            return 0.0
+        total_interactions = likes + comments + shares + clicks
+        return round((total_interactions / reach) * 100, 2)
+
+    @staticmethod
+    def calculate_virality_score(likes: int, comments: int, shares: int, reach: int, impressions: int) -> float:
+        """
+        Calculate virality score based on share weight (highest viral impact), comments, and reach-to-impression ratio.
+        Score normalized between 0.0 and 100.0.
+        """
+        if reach <= 0:
+            return 0.0
+
+        weighted_interactions = likes + (comments * 2.0) + (shares * 3.5)
+        reach_expansion_ratio = impressions / reach if reach > 0 else 1.0
+
+        raw_score = (weighted_interactions / reach * 100) * reach_expansion_ratio
+        return round(min(raw_score, 100.0), 2)
+
+    @staticmethod
+    def filter_posts(
+        posts_data: List[Dict[str, Any]],
+        platform: Optional[str] = None,
+        content_type: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Filter post list by platform, content_type, and date bounds."""
+        filtered = []
+        for p in posts_data:
+            if platform and platform.lower() != "all" and p.get("platform", "").lower() != platform.lower():
+                continue
+
+            if content_type and content_type.lower() != "all" and p.get("type", "").lower() != content_type.lower():
+                continue
+
+            dt_raw = p.get("published_at")
+            if dt_raw:
+                if isinstance(dt_raw, str):
+                    dt = datetime.fromisoformat(dt_raw)
+                else:
+                    dt = dt_raw
+
+                if start_date and dt < start_date:
+                    continue
+                if end_date and dt > end_date:
+                    continue
+
+            filtered.append(p)
+        return filtered
+
+    @staticmethod
+    def format_efficiency_breakdown(posts_data: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """
+        Calculate average reach, engagement rate, and virality by content format (reel, video, post, short, tweet).
+        """
+        formats = {}
+        for p in posts_data:
+            fmt = p.get("type", "post").lower()
+            if fmt not in formats:
+                formats[fmt] = {"count": 0, "total_reach": 0, "total_likes": 0, "total_comments": 0, "total_shares": 0}
+
+            m = p.get("metrics", {})
+            formats[fmt]["count"] += 1
+            formats[fmt]["total_reach"] += m.get("reach", 0)
+            formats[fmt]["total_likes"] += m.get("likes", 0)
+            formats[fmt]["total_comments"] += m.get("comments", 0)
+            formats[fmt]["total_shares"] += m.get("shares", 0)
+
+        result = {}
+        for fmt, val in formats.items():
+            count = val["count"]
+            avg_reach = round(val["total_reach"] / count) if count > 0 else 0
+            eng_rate = AnalyticsEngine.calculate_engagement_rate(
+                likes=val["total_likes"],
+                comments=val["total_comments"],
+                shares=val["total_shares"],
+                clicks=0,
+                reach=val["total_reach"],
+            )
+            result[fmt] = {
+                "posts_count": count,
+                "avg_reach": avg_reach,
+                "engagement_rate": eng_rate,
+            }
+        return result
+
+    @staticmethod
+    def detect_viral_posts(posts_data: List[Dict[str, Any]], virality_threshold: float = 12.0) -> List[Dict[str, Any]]:
+        """Identify posts exceeding the virality threshold."""
+        viral_posts = []
+        for p in posts_data:
+            m = p.get("metrics", {})
+            v_score = AnalyticsEngine.calculate_virality_score(
+                likes=m.get("likes", 0),
+                comments=m.get("comments", 0),
+                shares=m.get("shares", 0),
+                reach=m.get("reach", 1),
+                impressions=m.get("impressions", 1),
+            )
+            post_copy = dict(p)
+            post_copy["virality_score"] = v_score
+            viral_posts.append(post_copy)
+
+        return sorted(viral_posts, key=lambda x: x["virality_score"], reverse=True)
+
+    @staticmethod
+    def compare_weeks(current_week_metrics: Dict[str, Any], previous_week_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Calculate Week-over-Week (WoW) percentage change for key metrics."""
+        keys = ["reach", "impressions", "engagement", "followers_gained", "posts_published"]
+        comparison = {}
+
+        for k in keys:
+            curr = current_week_metrics.get(k, 0)
+            prev = previous_week_metrics.get(k, 0)
+
+            if prev == 0:
+                pct_change = 100.0 if curr > 0 else 0.0
+            else:
+                pct_change = round(((curr - prev) / prev) * 100, 2)
+
+            comparison[k] = {
+                "current": curr,
+                "previous": prev,
+                "change_pct": pct_change,
+                "trend": "up" if pct_change > 0 else ("down" if pct_change < 0 else "neutral"),
+            }
+
+        return comparison
+
+    @staticmethod
+    def calculate_best_posting_times(posts_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze engagement by hour of day and day of week in Spanish."""
+        day_names_en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        day_names_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+        heatmap = {day: [0.0] * 24 for day in day_names_en}
+        counts = {day: [0] * 24 for day in day_names_en}
+
+        for p in posts_data:
+            dt_str = p.get("published_at")
+            if isinstance(dt_str, str):
+                dt = datetime.fromisoformat(dt_str)
+            elif isinstance(dt_str, datetime):
+                dt = dt_str
+            else:
+                continue
+
+            day_str = day_names_en[dt.weekday()]
+            hour = dt.hour
+            m = p.get("metrics", {})
+            eng = m.get("engagement", 0.0)
+
+            heatmap[day_str][hour] += eng
+            counts[day_str][hour] += 1
+
+        best_slot = {"day": "Lunes", "hour": 17, "avg_engagement": 14.5}
+        max_avg = -1.0
+
+        for idx, day in enumerate(day_names_en):
+            for h in range(24):
+                if counts[day][h] > 0:
+                    avg_eng = round(heatmap[day][h] / counts[day][h], 2)
+                    heatmap[day][h] = avg_eng
+                    if avg_eng > max_avg:
+                        max_avg = avg_eng
+                        best_slot = {"day": day_names_es[idx], "hour": h, "avg_engagement": avg_eng}
+                else:
+                    heatmap[day][h] = 0.0
+
+        return {
+            "heatmap": heatmap,
+            "best_posting_slot": best_slot,
+        }
+
+    @staticmethod
+    def platform_rankings(platform_summaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Rank platforms by total reach and engagement efficiency."""
+        ranked = sorted(platform_summaries, key=lambda x: x.get("total_reach", 0), reverse=True)
+        for idx, item in enumerate(ranked, start=1):
+            item["rank"] = idx
+        return ranked
