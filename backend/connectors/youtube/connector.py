@@ -1,7 +1,7 @@
 import httpx
 import logging
 from typing import List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from backend.connectors.base import (
     BaseConnector,
     UnifiedAccountProfile,
@@ -79,12 +79,13 @@ class YouTubeConnector(BaseConnector):
     async def get_posts(self, since: Optional[datetime] = None) -> List[UnifiedPostDTO]:
         """Fetch YouTube videos and Shorts using Search / PlaylistItems API."""
         if not self.api_key or self.api_key.startswith("mock"):
+            now_utc = datetime.now(timezone.utc)
             return [
                 UnifiedPostDTO(
                     id="yt_video_301",
                     account_id=self.channel_id,
                     platform="youtube",
-                    published_at=datetime.utcnow(),
+                    published_at=now_utc,
                     type="video",
                     text="Análisis Completo de Tendencias Digitales 2026: Estrategias y Métricas Clave",
                     url="https://youtube.com/watch?v=301",
@@ -93,7 +94,7 @@ class YouTubeConnector(BaseConnector):
                     id="yt_video_302",
                     account_id=self.channel_id,
                     platform="youtube",
-                    published_at=datetime.utcnow(),
+                    published_at=now_utc,
                     type="short",
                     text="¿Cómo calcular tu tasa de engagement real en 30 segundos? #Shorts",
                     url="https://youtube.com/shorts/302",

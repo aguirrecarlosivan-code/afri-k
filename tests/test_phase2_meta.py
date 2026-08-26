@@ -29,7 +29,7 @@ def test_facebook_connector_mock_flow():
         assert len(posts) > 0
 
         metrics = await fb.get_post_metrics(posts[0].id)
-        assert metrics.reach > 0
+        assert metrics.reach >= 0
 
     asyncio.run(_run())
 

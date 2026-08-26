@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from backend.ai.sentiment import SentimentAnalyzer
 from backend.ai.engine import AIEngine
 
@@ -19,8 +19,8 @@ def test_sentiment_tone_analysis_critical():
 def test_ai_deep_analysis_categorized_recommendations():
     async def _run():
         engine = AIEngine(provider="gemini", api_key="mock_key")
-        start = datetime.utcnow() - timedelta(days=7)
-        end = datetime.utcnow()
+        start = datetime.now(timezone.utc) - timedelta(days=7)
+        end = datetime.now(timezone.utc)
 
         result = await engine.generate_executive_analysis(
             period_start=start,

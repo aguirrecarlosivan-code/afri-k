@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from backend.analytics.engine import AnalyticsEngine
 from backend.ai.engine import AIEngine
 
@@ -33,8 +33,8 @@ def test_week_over_week_comparison():
 def test_ai_engine_heuristic_fallback():
     async def _run():
         engine = AIEngine(provider="gemini", api_key="mock_key")
-        start = datetime.utcnow() - timedelta(days=7)
-        end = datetime.utcnow()
+        start = datetime.now(timezone.utc) - timedelta(days=7)
+        end = datetime.now(timezone.utc)
         
         result = await engine.generate_executive_analysis(
             period_start=start,

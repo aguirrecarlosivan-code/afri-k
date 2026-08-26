@@ -1,7 +1,7 @@
 import httpx
 import logging
 from typing import List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from backend.connectors.base import (
     BaseConnector,
     UnifiedAccountProfile,
@@ -74,12 +74,13 @@ class TikTokConnector(BaseConnector):
     async def get_posts(self, since: Optional[datetime] = None) -> List[UnifiedPostDTO]:
         """Fetch TikTok vertical videos."""
         if not self.access_token or self.access_token.startswith("mock"):
+            now_utc = datetime.now(timezone.utc)
             return [
                 UnifiedPostDTO(
                     id="tt_post_401",
                     account_id="tt_account_401",
                     platform="tiktok",
-                    published_at=datetime.utcnow(),
+                    published_at=now_utc,
                     type="video",
                     text="Errores comunes al analizar métricas en redes sociales 😱 #MarketingTips #Analytics",
                     url="https://tiktok.com/@radar/video/401",
