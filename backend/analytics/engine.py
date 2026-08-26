@@ -101,22 +101,37 @@ class AnalyticsEngine:
 
     @staticmethod
     def detect_viral_posts(posts_data: List[Dict[str, Any]], virality_threshold: float = 12.0) -> List[Dict[str, Any]]:
-        """Identify posts exceeding the virality threshold."""
-        viral_posts = []
+        """Rank posts primarily by Likes, then Comments, then Shares, then Reach."""
+        ranked_posts = []
         for p in posts_data:
             m = p.get("metrics", {})
+            likes = m.get("likes", 0)
+            comments = m.get("comments", 0)
+            shares = m.get("shares", 0)
+            reach = m.get("reach", 0)
             v_score = AnalyticsEngine.calculate_virality_score(
-                likes=m.get("likes", 0),
-                comments=m.get("comments", 0),
-                shares=m.get("shares", 0),
-                reach=m.get("reach", 1),
-                impressions=m.get("impressions", 1),
+                likes=likes,
+                comments=comments,
+                shares=shares,
+                reach=reach if reach > 0 else 1,
+                impressions=m.get("impressions", reach if reach > 0 else 1),
             )
             post_copy = dict(p)
             post_copy["virality_score"] = v_score
-            viral_posts.append(post_copy)
+            post_copy["total_interactions"] = likes + comments + shares
+            ranked_posts.append(post_copy)
 
-        return sorted(viral_posts, key=lambda x: x["virality_score"], reverse=True)
+        # Primary criterion: Likes (desc), then Comments (desc), then Shares (desc), then Reach (desc)
+        return sorted(
+            ranked_posts,
+            key=lambda x: (
+                x.get("metrics", {}).get("likes", 0),
+                x.get("metrics", {}).get("comments", 0),
+                x.get("metrics", {}).get("shares", 0),
+                x.get("metrics", {}).get("reach", 0),
+            ),
+            reverse=True,
+        )
 
     @staticmethod
     def compare_weeks(current_week_metrics: Dict[str, Any], previous_week_metrics: Dict[str, Any]) -> Dict[str, Any]:

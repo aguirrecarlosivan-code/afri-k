@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Flame, ExternalLink, Eye, ThumbsUp, MessageSquare, Share2, Filter, ArrowUpDown, AlertCircle } from 'lucide-react';
+import { ThumbsUp, MessageSquare, Share2, Eye, ExternalLink, Filter, ArrowUpDown, AlertCircle, Award } from 'lucide-react';
 
 export default function TopPostsTable({ posts = [] }) {
   const [selectedFormat, setSelectedFormat] = useState('all');
-  const [sortBy, setSortBy] = useState('virality');
+  const [sortBy, setSortBy] = useState('likes'); // Default: Likes -> Comments -> Shares
 
   const getPlatformBadge = (platform) => {
     const map = {
@@ -31,14 +31,35 @@ export default function TopPostsTable({ posts = [] }) {
     return (p.type || '').toLowerCase() === selectedFormat.toLowerCase();
   });
 
-  // Sort posts
+  // Sort posts primarily by Likes, then Comments, then Shares, then Reach
   const sortedPosts = [...filteredPosts].sort((a, b) => {
-    if (sortBy === 'virality') {
-      return (b.virality_score || 0) - (a.virality_score || 0);
+    const aLikes = a.metrics?.likes || 0;
+    const bLikes = b.metrics?.likes || 0;
+    const aComments = a.metrics?.comments || 0;
+    const bComments = b.metrics?.comments || 0;
+    const aShares = a.metrics?.shares || 0;
+    const bShares = b.metrics?.shares || 0;
+    const aReach = a.metrics?.reach || 0;
+    const bReach = b.metrics?.reach || 0;
+
+    if (sortBy === 'likes') {
+      if (bLikes !== aLikes) return bLikes - aLikes;
+      if (bComments !== aComments) return bComments - aComments;
+      if (bShares !== aShares) return bShares - aShares;
+      return bReach - aReach;
+    } else if (sortBy === 'comments') {
+      if (bComments !== aComments) return bComments - aComments;
+      if (bLikes !== aLikes) return bLikes - aLikes;
+      if (bShares !== aShares) return bShares - aShares;
+      return bReach - aReach;
+    } else if (sortBy === 'shares') {
+      if (bShares !== aShares) return bShares - aShares;
+      if (bLikes !== aLikes) return bLikes - aLikes;
+      if (bComments !== aComments) return bComments - aComments;
+      return bReach - aReach;
     } else if (sortBy === 'reach') {
-      return (b.metrics?.reach || 0) - (a.metrics?.reach || 0);
-    } else if (sortBy === 'likes') {
-      return (b.metrics?.likes || 0) - (a.metrics?.likes || 0);
+      if (bReach !== aReach) return bReach - aReach;
+      return bLikes - aLikes;
     }
     return 0;
   });
@@ -47,11 +68,13 @@ export default function TopPostsTable({ posts = [] }) {
     <div className="glass-panel p-6 rounded-2xl">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
         <div>
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Flame className="w-5 h-5 text-amber-400" />
-            Top Publicaciones Virales Destacadas
+          <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
+            <Award className="w-5 h-5 text-amber-400" />
+            Top Publicaciones con Mayor Interacción
           </h3>
-          <p className="text-xs text-slate-400">Publicaciones reales extraídas directamente de la API de Meta Graph para Once Noticias</p>
+          <p className="text-xs text-slate-400">
+            Publicaciones reales ordenadas por Reacciones (Likes), Comentarios y Compartidos
+          </p>
         </div>
 
         {/* Filters and Sorting Controls */}
@@ -72,7 +95,7 @@ export default function TopPostsTable({ posts = [] }) {
             </select>
           </div>
 
-          {/* Sort By */}
+          {/* Sort By Dropdown */}
           <div className="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
             <ArrowUpDown className="w-3.5 h-3.5 text-cyan-400" />
             <select
@@ -80,9 +103,10 @@ export default function TopPostsTable({ posts = [] }) {
               onChange={(e) => setSortBy(e.target.value)}
               className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer"
             >
-              <option value="virality">Score Virilidad</option>
-              <option value="reach">Mayor Alcance</option>
-              <option value="likes">Más Reacciones</option>
+              <option value="likes">Más Likes / Reacciones</option>
+              <option value="comments">Más Comentadas</option>
+              <option value="shares">Más Compartidas</option>
+              <option value="reach">Mayor Alcance (Views)</option>
             </select>
           </div>
         </div>
@@ -99,23 +123,32 @@ export default function TopPostsTable({ posts = [] }) {
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-900/60 text-xs uppercase text-slate-400 border-b border-slate-800">
               <tr>
+                <th className="py-3 px-3 text-center">#</th>
                 <th className="py-3 px-4">Canal</th>
                 <th className="py-3 px-4">Formato</th>
                 <th className="py-3 px-4">Contenido / Titular Real</th>
-                <th className="py-3 px-4">Alcance</th>
-                <th className="py-3 px-4">Interacciones</th>
-                <th className="py-3 px-4 text-center">Score Virilidad</th>
+                <th className="py-3 px-4">Alcance Real</th>
+                <th className="py-3 px-4">Desglose (Likes / Comentarios / Shares)</th>
+                <th className="py-3 px-4 text-center">Total Interacciones</th>
                 <th className="py-3 px-4 text-right">Enlace Directo</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {sortedPosts.map((post) => {
+              {sortedPosts.map((post, idx) => {
                 const displayUrl = post.url || `https://www.facebook.com/${post.id}`;
                 const displayText = post.text || 'Publicación de Once Noticias';
                 const buttonLabel = getPlatformButtonText(post.platform);
+                const totalActions = (post.metrics?.likes || 0) + (post.metrics?.comments || 0) + (post.metrics?.shares || 0);
 
                 return (
                   <tr key={post.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3.5 px-3 text-center font-bold text-xs text-slate-500">
+                      {idx === 0 ? <span className="text-amber-400 font-extrabold text-sm">🥇 1</span> :
+                       idx === 1 ? <span className="text-slate-300 font-extrabold text-sm">🥈 2</span> :
+                       idx === 2 ? <span className="text-amber-600 font-extrabold text-sm">🥉 3</span> :
+                       <span>#{idx + 1}</span>}
+                    </td>
+
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border uppercase ${getPlatformBadge(post.platform)}`}>
                         {post.platform}
@@ -135,29 +168,29 @@ export default function TopPostsTable({ posts = [] }) {
                     </td>
 
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-slate-300">
-                        <Eye className="w-4 h-4 text-slate-500" />
+                      <div className="flex items-center gap-1.5 text-slate-300 text-xs font-bold">
+                        <Eye className="w-4 h-4 text-slate-400" />
                         <span>{(post.metrics?.reach || 0).toLocaleString()}</span>
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3 text-xs text-slate-400">
-                        <span className="flex items-center gap-1 text-emerald-400">
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20" title="Likes / Reacciones">
                           <ThumbsUp className="w-3.5 h-3.5" /> {(post.metrics?.likes || 0).toLocaleString()}
                         </span>
-                        <span className="flex items-center gap-1 text-cyan-400">
+                        <span className="flex items-center gap-1 text-cyan-400 font-bold bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20" title="Comentarios">
                           <MessageSquare className="w-3.5 h-3.5" /> {(post.metrics?.comments || 0).toLocaleString()}
                         </span>
-                        <span className="flex items-center gap-1 text-purple-400">
+                        <span className="flex items-center gap-1 text-purple-400 font-bold bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-500/20" title="Compartidos">
                           <Share2 className="w-3.5 h-3.5" /> {(post.metrics?.shares || 0).toLocaleString()}
                         </span>
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                        🔥 {post.virality_score || 18.5} / 100
+                      <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-gradient-to-r from-emerald-950 to-indigo-950 text-emerald-300 border border-emerald-500/40 shadow-sm">
+                        ⚡ {totalActions.toLocaleString()} acciones
                       </span>
                     </td>
 
