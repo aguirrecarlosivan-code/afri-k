@@ -10,6 +10,7 @@ import PlatformDeepMetricsMatrix from './components/PlatformDeepMetricsMatrix';
 import TopPostsTable from './components/TopPostsTable';
 import AIExecutiveSummaryCard from './components/AIExecutiveSummaryCard';
 import ReportExportModal from './components/ReportExportModal';
+import AccountConnectorModal from './components/AccountConnectorModal';
 import DateRangeFilter from './components/DateRangeFilter';
 import PlatformTabs from './components/PlatformTabs';
 import { Users, Eye, Zap, Activity, Video, Clock, Share2 } from 'lucide-react';
@@ -20,6 +21,8 @@ export default function App() {
   const [aiReport, setAiReport] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isConnectorOpen, setIsConnectorOpen] = useState(false);
+  const [connectorPlatform, setConnectorPlatform] = useState('facebook');
   const [lastUpdated, setLastUpdated] = useState('');
 
   const [selectedDays, setSelectedDays] = useState(7);
@@ -65,11 +68,9 @@ export default function App() {
       updateTimestamp(resFiltered?.last_updated_at);
     } catch (err) {
       console.log(`Backend not available (attempt ${retryCount + 1}/5) - retrying in 3s...`);
-      // Auto-retry up to 5 times with 3-second delay
       if (retryCount < 4) {
         setTimeout(() => fetchData(retryCount + 1), 3000);
       } else {
-        console.log('Backend unavailable after 5 attempts - showing empty state');
         setData({
           kpis: {
             total_followers: 0, total_reach: 0, total_impressions: 0,
@@ -118,6 +119,11 @@ export default function App() {
     }
   };
 
+  const handleOpenConnector = (platformName = 'facebook') => {
+    setConnectorPlatform(platformName);
+    setIsConnectorOpen(true);
+  };
+
   const kpis = data?.kpis || {};
   const wow = data?.wow_comparison || {};
 
@@ -126,6 +132,7 @@ export default function App() {
       <Header
         onTriggerAI={handleTriggerAI}
         onOpenExport={() => setIsExportOpen(true)}
+        onOpenConnector={handleOpenConnector}
         isSyncing={isSyncing}
         lastUpdated={lastUpdated}
       />
@@ -220,7 +227,12 @@ export default function App() {
 
         {/* Detailed API Metrics Matrix Across All Networks */}
         <section>
-          <PlatformDeepMetricsMatrix platforms={data?.platforms || []} />
+          <PlatformDeepMetricsMatrix
+            platforms={data?.platforms || []}
+            onOpenConnector={handleOpenConnector}
+            onSelectPlatform={setSelectedPlatform}
+            selectedPlatform={selectedPlatform}
+          />
         </section>
 
         {/* Top Posts Table - ONLY real data from APIs, no mock fallback */}
@@ -230,6 +242,12 @@ export default function App() {
       </main>
 
       <ReportExportModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} />
+      <AccountConnectorModal
+        isOpen={isConnectorOpen}
+        onClose={() => setIsConnectorOpen(false)}
+        defaultPlatform={connectorPlatform}
+        onCredentialsSaved={() => fetchData()}
+      />
     </div>
   );
 }
