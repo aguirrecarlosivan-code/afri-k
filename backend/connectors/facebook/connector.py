@@ -91,7 +91,7 @@ class FacebookConnector(BaseConnector):
             f"{self.page_id}/published_posts",
             params={
                 "fields": "id,message,story,created_time,permalink_url,attachments{title,description,media_type,unshimmed_url,target},reactions.summary(true),comments.summary(true),shares",
-                "limit": "100",
+                "limit": "35",
                 "access_token": self.access_token,
             },
         )
@@ -117,14 +117,8 @@ class FacebookConnector(BaseConnector):
             else:
                 clean_text = "Publicación informativa de Once Noticias"
 
-            raw_id = item.get("id", "")
-            post_short_id = raw_id.split("_")[-1] if "_" in raw_id else raw_id
             raw_permalink = item.get("permalink_url", "")
-
-            if "reel" in raw_permalink:
-                clean_url = raw_permalink
-            else:
-                clean_url = f"https://www.facebook.com/185059331531730/posts/{post_short_id}"
+            clean_url = raw_permalink if raw_permalink else f"https://www.facebook.com/{raw_id}"
 
             # Exact reactions, comments, shares from summary
             likes = item.get("reactions", {}).get("summary", {}).get("total_count", 0)

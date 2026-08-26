@@ -27,7 +27,7 @@ class MetaResilientClient:
         """
         url = f"{cls.BASE_URL}/{endpoint.lstrip('/')}"
 
-        async with httpx.AsyncClient(timeout=12.0) as client:
+        async with httpx.AsyncClient(timeout=20.0) as client:
             try:
                 res = await client.get(url, params=params)
                 data = res.json()
@@ -47,5 +47,7 @@ class MetaResilientClient:
                 return {"error": error.get("message", "API request failed")}
 
             except Exception as e:
-                logger.warning(f"Meta HTTP request exception: {e}")
+                import traceback
+                print(f"Meta HTTP request exception: {type(e).__name__}: {e}")
+                traceback.print_exc()
                 return {"error": str(e)}
