@@ -27,7 +27,7 @@ class MetaResilientClient:
         """
         url = f"{cls.BASE_URL}/{endpoint.lstrip('/')}"
 
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=12.0) as client:
             try:
                 res = await client.get(url, params=params)
                 data = res.json()

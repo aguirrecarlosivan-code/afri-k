@@ -91,6 +91,7 @@ class FacebookConnector(BaseConnector):
             f"{self.page_id}/published_posts",
             params={
                 "fields": "id,message,story,created_time,permalink_url,attachments{title,description,media_type,unshimmed_url,target},reactions.summary(true),comments.summary(true),shares",
+                "limit": "100",
                 "access_token": self.access_token,
             },
         )
@@ -99,7 +100,7 @@ class FacebookConnector(BaseConnector):
 
         data = res.get("data", [])
         posts = []
-        for item in data[:15]:
+        for item in data:
             try:
                 created_time = datetime.strptime(item["created_time"], "%Y-%m-%dT%H:%M:%S%z").replace(tzinfo=None)
             except Exception:
