@@ -67,18 +67,29 @@ class InstagramConnector(BaseConnector):
             followers_count=data.get("followers_count", 60240),
         )
 
-    async def get_posts_with_metrics(self) -> Tuple[List[Dict[str, Any]], int]:
-        """Fetch real Instagram Media and Metrics in single batch call."""
+    async def get_posts_with_metrics(
+        self,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+        limit: int = 35,
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Fetch real Instagram Media and Metrics for any date window (since/until)."""
         if not self.access_token or self.access_token.startswith("mock"):
             return [], 0
 
+        params = {
+            "fields": "id,caption,media_type,permalink,timestamp,like_count,comments_count",
+            "limit": str(limit),
+            "access_token": self.access_token,
+        }
+        if since:
+            params["since"] = str(int(since.timestamp()))
+        if until:
+            params["until"] = str(int(until.timestamp()))
+
         res = await MetaResilientClient.get(
             endpoint=f"{self.ig_id}/media",
-            params={
-                "fields": "id,caption,media_type,permalink,timestamp,like_count,comments_count",
-                "limit": "40",
-                "access_token": self.access_token,
-            },
+            params=params,
         )
         if "error" in res or not res.get("data"):
             return [], 0

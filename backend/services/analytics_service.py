@@ -1,5 +1,5 @@
 # ==============================================================================
-# 📊 AFRI-K SOCIAL INTELLIGENCE - UNIFIED ANALYTICS SERVICE (HIGH-SPEED & 100% REAL)
+# 📊 AFRI-K SOCIAL INTELLIGENCE - UNIFIED ANALYTICS SERVICE (HISTORICAL & REAL)
 # ==============================================================================
 
 import asyncio
@@ -16,13 +16,12 @@ from backend.connectors.base import UnifiedPostDTO, UnifiedMetricsDTO
 
 logger = logging.getLogger("radar.services.analytics")
 
-# 10-Minute High-Speed In-Memory Cache for Sub-10ms UI Performance
-_CACHE: Dict[str, Any] = {
+# Multi-Period In-Memory Cache (keys: 'YYYY-MM-DD_YYYY-MM-DD')
+_CACHE_STORE: Dict[str, Any] = {}
+_PROFILE_CACHE: Dict[str, Any] = {
     "last_fetched_time": 0,
     "fb_followers": 2175840,
-    "fb_posts": [],
     "ig_followers": 60240,
-    "ig_posts": [],
 }
 
 
@@ -36,45 +35,54 @@ def _has_real_credentials(key_value: Optional[str]) -> bool:
 class AnalyticsService:
     """
     Centralized high-speed service that aggregates social media metrics
-    from official live APIs ONLY (Facebook + Instagram via Meta Graph API v21.0).
-    Strictly zero simulated or fictitious posts.
+    from official live APIs (Facebook + Instagram) supporting any month, quarter,
+    or custom period via since/until timestamps. Strictly zero simulated posts.
     """
 
     @classmethod
-    async def _fetch_channel_data_cached(cls, force_refresh: bool = False) -> Tuple[int, List[Dict[str, Any]], int, List[Dict[str, Any]]]:
+    async def _fetch_channel_data_cached(
+        cls,
+        start_dt: datetime,
+        end_dt: datetime,
+        force_refresh: bool = False,
+    ) -> Tuple[int, List[Dict[str, Any]], int, List[Dict[str, Any]]]:
         """
-        Fetches live Facebook and Instagram data from Meta Graph API with a 600-second TTL cache.
+        Fetches channel posts for the requested time window (since/until) with a multi-key cache.
         """
+        cache_key = f"{start_dt.strftime('%Y-%m-%d')}_{end_dt.strftime('%Y-%m-%d')}"
         now = time.time()
-        # 10-minute cache to guarantee instant sub-10ms UI interactions
-        if not force_refresh and (now - _CACHE["last_fetched_time"] < 600) and (_CACHE["fb_posts"] or _CACHE["ig_posts"]):
-            return (
-                _CACHE["fb_followers"],
-                _CACHE["fb_posts"],
-                _CACHE["ig_followers"],
-                _CACHE["ig_posts"],
-            )
 
-        fb_followers = 2175840
+        if not force_refresh and cache_key in _CACHE_STORE:
+            cached_entry = _CACHE_STORE[cache_key]
+            if (now - cached_entry["timestamp"]) < 600:
+                return (
+                    cached_entry["fb_followers"],
+                    cached_entry["fb_posts"],
+                    cached_entry["ig_followers"],
+                    cached_entry["ig_posts"],
+                )
+
+        fb_followers = _PROFILE_CACHE["fb_followers"]
         live_fb_posts: List[Dict[str, Any]] = []
 
-        ig_followers = 60240
+        ig_followers = _PROFILE_CACHE["ig_followers"]
         live_ig_posts: List[Dict[str, Any]] = []
 
-        # 1. Fetch live Facebook data
+        # 1. Fetch Facebook profile and period posts
         if _has_real_credentials(settings.FACEBOOK_PAGE_ACCESS_TOKEN):
             try:
                 fb = FacebookConnector()
-                fb_profile, (live_fb_posts, _) = await asyncio.gather(
-                    fb.get_profile(),
-                    fb.get_posts_with_metrics(),
+                if (now - _PROFILE_CACHE["last_fetched_time"]) > 600:
+                    fb_profile = await fb.get_profile()
+                    if fb_profile and fb_profile.followers_count > 0:
+                        fb_followers = fb_profile.followers_count
+                        _PROFILE_CACHE["fb_followers"] = fb_followers
+
+                live_fb_posts, _ = await fb.get_posts_with_metrics(
+                    since=start_dt,
+                    until=end_dt,
+                    limit=35,
                 )
-                if fb_profile and fb_profile.followers_count > 0:
-                    fb_followers = fb_profile.followers_count
-                    try:
-                        await DatabaseSyncService.sync_account_profile(fb_profile)
-                    except Exception as db_err:
-                        logger.debug(f"DB sync profile notice: {db_err}")
 
                 if live_fb_posts:
                     dto_posts = [
@@ -108,20 +116,21 @@ class AnalyticsService:
             except Exception as e:
                 logger.warning(f"Facebook batch fetch notice: {e}")
 
-        # 2. Fetch live Instagram data (@once_noticias_)
+        # 2. Fetch Instagram profile and period posts
         if _has_real_credentials(settings.FACEBOOK_PAGE_ACCESS_TOKEN):
             try:
                 ig = InstagramConnector()
-                ig_profile, (live_ig_posts, _) = await asyncio.gather(
-                    ig.get_profile(),
-                    ig.get_posts_with_metrics(),
+                if (now - _PROFILE_CACHE["last_fetched_time"]) > 600:
+                    ig_profile = await ig.get_profile()
+                    if ig_profile and ig_profile.followers_count > 0:
+                        ig_followers = ig_profile.followers_count
+                        _PROFILE_CACHE["ig_followers"] = ig_followers
+
+                live_ig_posts, _ = await ig.get_posts_with_metrics(
+                    since=start_dt,
+                    until=end_dt,
+                    limit=35,
                 )
-                if ig_profile and ig_profile.followers_count > 0:
-                    ig_followers = ig_profile.followers_count
-                    try:
-                        await DatabaseSyncService.sync_account_profile(ig_profile)
-                    except Exception as db_err:
-                        logger.debug(f"DB sync IG profile notice: {db_err}")
 
                 if live_ig_posts:
                     dto_posts = [
@@ -155,12 +164,14 @@ class AnalyticsService:
             except Exception as e:
                 logger.warning(f"Instagram batch fetch notice: {e}")
 
-        # Update in-memory cache
-        _CACHE["last_fetched_time"] = now
-        _CACHE["fb_followers"] = fb_followers
-        _CACHE["fb_posts"] = live_fb_posts
-        _CACHE["ig_followers"] = ig_followers
-        _CACHE["ig_posts"] = live_ig_posts
+        _PROFILE_CACHE["last_fetched_time"] = now
+        _CACHE_STORE[cache_key] = {
+            "timestamp": now,
+            "fb_followers": fb_followers,
+            "fb_posts": live_fb_posts,
+            "ig_followers": ig_followers,
+            "ig_posts": live_ig_posts,
+        }
 
         return fb_followers, live_fb_posts, ig_followers, live_ig_posts
 
@@ -176,18 +187,16 @@ class AnalyticsService:
     ) -> Dict[str, Any]:
         """
         Retrieves consolidated analytics, metrics breakdown, top posts, and format efficiencies
-        from live API data exclusively. Sub-10ms response from cached memory.
+        for any requested month, quarter, or custom date window.
         """
         sel_plat = (platform or "all").lower()
-
-        fb_followers, live_fb_posts, ig_followers, live_ig_posts = await cls._fetch_channel_data_cached(force_refresh=force_refresh)
 
         # 1. Parse date bounds
         now_dt = datetime.utcnow()
         if start_date and end_date:
             try:
                 start_dt = datetime.fromisoformat(start_date)
-                end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)
+                end_dt = datetime.fromisoformat(end_date) + timedelta(hours=23, minutes=59, seconds=59)
                 calculated_days = max(1, (end_dt - start_dt).days)
             except Exception:
                 calculated_days = int(days) if days else 30
@@ -198,7 +207,13 @@ class AnalyticsService:
             start_dt = now_dt - timedelta(days=calculated_days)
             end_dt = now_dt
 
-        # Combined pool of real posts
+        fb_followers, live_fb_posts, ig_followers, live_ig_posts = await cls._fetch_channel_data_cached(
+            start_dt=start_dt,
+            end_dt=end_dt,
+            force_refresh=force_refresh,
+        )
+
+        # Combined pool of real posts for the window
         all_real_posts = live_fb_posts + live_ig_posts
 
         # Filter by platform
@@ -211,7 +226,7 @@ class AnalyticsService:
         else:
             platform_pool = []
 
-        # Filter by date range and content type
+        # Filter by content type if specified
         date_filtered_posts = AnalyticsEngine.filter_posts(
             posts_data=platform_pool,
             platform=platform,

@@ -79,21 +79,32 @@ class FacebookConnector(BaseConnector):
             followers_count=followers,
         )
 
-    async def get_posts_with_metrics(self) -> Tuple[List[dict], int]:
+    async def get_posts_with_metrics(
+        self,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
+        limit: int = 35,
+    ) -> Tuple[List[dict], int]:
         """
-        Single-query batch fetch: retrieves 15 published posts WITH reactions, comments, and shares
-        in 1 single HTTP request (~0.3s) instead of 16 separate sequential requests.
+        Batch fetch: retrieves published posts WITH reactions, comments, shares, and permalinks
+        for any specific date window (since/until) directly from Meta Graph API.
         """
         if not self.access_token or self.access_token.startswith("mock"):
             return [], 0
 
+        params = {
+            "fields": "id,message,story,created_time,permalink_url,attachments{title,description,media_type,unshimmed_url,target},reactions.summary(true),comments.summary(true),shares",
+            "limit": str(limit),
+            "access_token": self.access_token,
+        }
+        if since:
+            params["since"] = str(int(since.timestamp()))
+        if until:
+            params["until"] = str(int(until.timestamp()))
+
         res = await MetaResilientClient.get(
             f"{self.page_id}/published_posts",
-            params={
-                "fields": "id,message,story,created_time,permalink_url,attachments{title,description,media_type,unshimmed_url,target},reactions.summary(true),comments.summary(true),shares",
-                "limit": "35",
-                "access_token": self.access_token,
-            },
+            params=params,
         )
         if "error" in res or not res.get("data"):
             return [], 0
