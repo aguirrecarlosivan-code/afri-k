@@ -44,3 +44,11 @@ async def get_filtered_analytics(
 async def get_best_posting_times() -> Dict[str, Any]:
     """Returns optimal posting time recommendations and heatmap."""
     return await AnalyticsService.get_heatmap_data()
+
+
+@router.get("/top-yearly-posts")
+async def get_top_yearly_posts(
+    year: Optional[int] = Query(2026, description="Year to analyze"),
+) -> Dict[str, Any]:
+    """Returns the top 5 most-liked publications of the entire year for Facebook and Instagram."""
+    return await AnalyticsService.get_yearly_top_posts(year=year)

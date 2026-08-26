@@ -8,6 +8,7 @@ import SentimentAnalysisChart from './components/SentimentAnalysisChart';
 import PlatformReachShareChart from './components/PlatformReachShareChart';
 import PlatformDeepMetricsMatrix from './components/PlatformDeepMetricsMatrix';
 import TopPostsTable from './components/TopPostsTable';
+import YearlyTopPostsLeaderboard from './components/YearlyTopPostsLeaderboard';
 import AIExecutiveSummaryCard from './components/AIExecutiveSummaryCard';
 import ReportExportModal from './components/ReportExportModal';
 import AccountConnectorModal from './components/AccountConnectorModal';
@@ -19,6 +20,7 @@ export default function App() {
   const [data, setData] = useState(null);
   const [heatmap, setHeatmap] = useState(null);
   const [aiReport, setAiReport] = useState(null);
+  const [yearlyTopPosts, setYearlyTopPosts] = useState({ facebook_top_5: [], instagram_top_5: [] });
   const [isSyncing, setIsSyncing] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isConnectorOpen, setIsConnectorOpen] = useState(false);
@@ -55,6 +57,14 @@ export default function App() {
         if (resAI && resAI.ai_report) setAiReport(resAI.ai_report);
       })
       .catch((e) => console.log('AI background summary fetch notice:', e));
+
+    // Fetch Top 5 Yearly Posts for Facebook & Instagram
+    fetch('/api/v1/analytics/top-yearly-posts')
+      .then((r) => r.json())
+      .then((resYearly) => {
+        if (resYearly) setYearlyTopPosts(resYearly);
+      })
+      .catch((e) => console.log('Yearly top posts fetch notice:', e));
   }, []);
 
   const fetchData = async (retryCount = 0) => {
@@ -243,7 +253,16 @@ export default function App() {
           </div>
         </section>
 
-        {/* Top Posts Table - ONLY real data from APIs, no mock fallback */}
+        {/* Annual Top 5 Leaderboard: Facebook & Instagram (Whole Year 2026) */}
+        <section>
+          <YearlyTopPostsLeaderboard
+            fbTop5={yearlyTopPosts.facebook_top_5 || []}
+            igTop5={yearlyTopPosts.instagram_top_5 || []}
+            year={2026}
+          />
+        </section>
+
+        {/* Top Posts Table - Filtered by selected month / quarter / channel */}
         <section>
           <TopPostsTable posts={data?.posts || []} />
         </section>

@@ -347,6 +347,38 @@ class AnalyticsService:
         return AnalyticsEngine.calculate_best_posting_times(posts)
 
     @classmethod
+    async def get_yearly_top_posts(cls, year: int = 2026) -> Dict[str, Any]:
+        """
+        Fetches and extracts the authentic Top 5 most-liked posts of the entire year
+        for Facebook and Instagram separately.
+        """
+        start_dt = datetime(year, 1, 1, 0, 0, 0)
+        end_dt = datetime(year, 12, 31, 23, 59, 59)
+
+        fb_followers, live_fb_posts, ig_followers, live_ig_posts = await cls._fetch_channel_data_cached(
+            start_dt=start_dt,
+            end_dt=end_dt,
+        )
+
+        fb_top_5 = sorted(
+            live_fb_posts,
+            key=lambda x: (x.get("metrics", {}).get("likes", 0), x.get("metrics", {}).get("comments", 0), x.get("metrics", {}).get("shares", 0)),
+            reverse=True,
+        )[:5]
+
+        ig_top_5 = sorted(
+            live_ig_posts,
+            key=lambda x: (x.get("metrics", {}).get("likes", 0), x.get("metrics", {}).get("comments", 0)),
+            reverse=True,
+        )[:5]
+
+        return {
+            "year": year,
+            "facebook_top_5": fb_top_5,
+            "instagram_top_5": ig_top_5,
+        }
+
+    @classmethod
     async def get_analytics_for_ai_and_reports(cls, platform: str = "all", days: int = 30) -> Dict[str, Any]:
         """Convenience method for AI Engine and Report Generators."""
         return await cls.get_aggregated_data(platform=platform, days=days)
