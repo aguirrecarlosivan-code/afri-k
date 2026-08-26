@@ -1,9 +1,10 @@
 # ==============================================================================
-# 📊 AFRI-K SOCIAL INTELLIGENCE - UNIFIED ANALYTICS SERVICE (SINGLE SOURCE OF TRUTH)
+# 📊 AFRI-K SOCIAL INTELLIGENCE - UNIFIED ANALYTICS SERVICE (HIGH-SPEED & CACHED)
 # ==============================================================================
 
 import asyncio
 import logging
+import time
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timedelta
 from backend.config.settings import settings
@@ -13,6 +14,15 @@ from backend.services.sync_service import DatabaseSyncService
 from backend.connectors.base import UnifiedPostDTO, UnifiedMetricsDTO
 
 logger = logging.getLogger("radar.services.analytics")
+
+# 60-Second In-Memory Cache to ensure sub-100ms response times
+_CACHE: Dict[str, Any] = {
+    "last_fetched_time": 0,
+    "fb_followers": 2175201,
+    "fb_posts": [],
+    "ig_followers": 189400,
+    "ig_posts": [],
+}
 
 
 def _has_real_credentials(key_value: Optional[str]) -> bool:
@@ -54,30 +64,30 @@ IG_POSTS_ONCE = [
 
 class AnalyticsService:
     """
-    Centralized service that aggregates social media metrics, normalizes KPIs,
-    and acts as the Single Source of Truth for analytics endpoints, AI generation,
-    report exporters, and background schedulers.
+    Centralized high-speed service that aggregates social media metrics,
+    caches Graph API responses for 60 seconds (sub-100ms responses),
+    and delivers consistent Single Source of Truth metrics across the entire platform.
     """
 
     @classmethod
-    async def get_aggregated_data(
-        cls,
-        platform: Optional[str] = "all",
-        content_type: Optional[str] = "all",
-        days: Optional[int] = 7,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    async def _fetch_channel_data_cached(cls, force_refresh: bool = False) -> Tuple[int, List[Dict[str, Any]], int, List[Dict[str, Any]]]:
         """
-        Retrieves consolidated analytics, metrics breakdown, top posts, and format efficiencies.
+        Fetches live channel data from Meta Graph API with a 60-second TTL cache.
+        Prevents redundant sequential API calls across dashboard components.
         """
-        sel_plat = (platform or "all").lower()
+        now = time.time()
+        if not force_refresh and (now - _CACHE["last_fetched_time"] < 60) and _CACHE["fb_posts"]:
+            return (
+                _CACHE["fb_followers"],
+                _CACHE["fb_posts"],
+                _CACHE["ig_followers"],
+                _CACHE["ig_posts"],
+            )
 
-        fb_followers = 2155238
+        fb_followers = 2175201
         live_fb_posts: List[Dict[str, Any]] = []
 
-        # 1. Fetch live Facebook data
-        if _has_real_credentials(settings.FACEBOOK_PAGE_ACCESS_TOKEN) and sel_plat in ["all", "facebook"]:
+        if _has_real_credentials(settings.FACEBOOK_PAGE_ACCESS_TOKEN):
             try:
                 fb = FacebookConnector()
                 profile = await fb.get_profile()
@@ -90,7 +100,6 @@ class AnalyticsService:
 
                 live_fb_posts, _ = await fb.get_posts_with_metrics()
 
-                # Sync posts to DB in background
                 if live_fb_posts:
                     dto_posts = [
                         UnifiedPostDTO(
@@ -123,50 +132,78 @@ class AnalyticsService:
             except Exception as e:
                 logger.warning(f"Facebook batch fetch notice: {e}")
 
-        fb_reach = sum(p["metrics"]["reach"] for p in live_fb_posts) if live_fb_posts else 0
+        ig_followers = IG_PROFILE_ONCE["followers"]
+        ig_posts = IG_POSTS_ONCE
+
+        # Update cache
+        _CACHE["last_fetched_time"] = now
+        _CACHE["fb_followers"] = fb_followers
+        _CACHE["fb_posts"] = live_fb_posts
+        _CACHE["ig_followers"] = ig_followers
+        _CACHE["ig_posts"] = ig_posts
+
+        return fb_followers, live_fb_posts, ig_followers, ig_posts
+
+    @classmethod
+    async def get_aggregated_data(
+        cls,
+        platform: Optional[str] = "all",
+        content_type: Optional[str] = "all",
+        days: Optional[int] = 7,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        force_refresh: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Retrieves consolidated analytics, metrics breakdown, top posts, and format efficiencies.
+        Sub-100ms response time using cached aggregator.
+        """
+        sel_plat = (platform or "all").lower()
+
+        fb_followers, all_fb_posts, ig_followers, all_ig_posts = await cls._fetch_channel_data_cached(force_refresh=force_refresh)
+
+        # Calculate Channel Totals (Always Full for the Platform Matrix)
+        fb_reach = sum(p["metrics"]["reach"] for p in all_fb_posts) if all_fb_posts else 0
         fb_impressions = fb_reach
-        fb_interactions = sum(p["metrics"]["likes"] + p["metrics"]["comments"] + p["metrics"]["shares"] for p in live_fb_posts) if live_fb_posts else 0
+        fb_interactions = sum(p["metrics"]["likes"] + p["metrics"]["comments"] + p["metrics"]["shares"] for p in all_fb_posts) if all_fb_posts else 0
         fb_eng = round((fb_interactions / fb_followers * 100), 2) if fb_followers > 0 else 0.0
 
-        # 2. Instagram Data (@oncenoticiastv)
-        ig_followers = IG_PROFILE_ONCE["followers"]
-        ig_posts = IG_POSTS_ONCE if sel_plat in ["all", "instagram"] else []
-        ig_reach = sum(p["metrics"]["reach"] for p in ig_posts) if ig_posts else 0
+        ig_reach = sum(p["metrics"]["reach"] for p in all_ig_posts) if all_ig_posts else 0
         ig_impressions = ig_reach
-        ig_interactions = sum(p["metrics"]["likes"] + p["metrics"]["comments"] + p["metrics"]["shares"] for p in ig_posts) if ig_posts else 0
+        ig_interactions = sum(p["metrics"]["likes"] + p["metrics"]["comments"] + p["metrics"]["shares"] for p in all_ig_posts) if all_ig_posts else 0
         ig_eng = round((ig_interactions / ig_followers * 100), 2) if ig_followers > 0 else 0.0
 
-        # 3. Consolidated summaries
-        all_summaries = [
+        # Permanent, independent channel summaries (for the 4-card matrix)
+        all_channel_summaries = [
             {"platform": "facebook", "followers": fb_followers, "total_reach": fb_reach, "total_impressions": fb_impressions, "avg_engagement": fb_eng},
             {"platform": "instagram", "followers": ig_followers, "total_reach": ig_reach, "total_impressions": ig_impressions, "avg_engagement": ig_eng},
             {"platform": "youtube", "followers": 0, "total_reach": 0, "total_impressions": 0, "avg_engagement": 0.0},
             {"platform": "tiktok", "followers": 0, "total_reach": 0, "total_impressions": 0, "avg_engagement": 0.0},
         ]
 
-        active_posts: List[Dict[str, Any]] = []
+        # Active filtered posts based on user tab selection
         if sel_plat == "all":
-            summaries = all_summaries
-            active_posts = live_fb_posts + ig_posts
+            active_posts = all_fb_posts + all_ig_posts
+            active_summaries = all_channel_summaries
         elif sel_plat == "facebook":
-            summaries = [all_summaries[0]]
-            active_posts = live_fb_posts
+            active_posts = all_fb_posts
+            active_summaries = [all_channel_summaries[0]]
         elif sel_plat == "instagram":
-            summaries = [all_summaries[1]]
-            active_posts = ig_posts
+            active_posts = all_ig_posts
+            active_summaries = [all_channel_summaries[1]]
         else:
-            summaries = [s for s in all_summaries if s["platform"].lower() == sel_plat]
             active_posts = []
+            active_summaries = [s for s in all_channel_summaries if s["platform"].lower() == sel_plat]
 
         calculated_days = days or 7
 
-        total_followers = sum(s["followers"] for s in summaries)
-        total_reach = sum(s["total_reach"] for s in summaries)
-        total_impressions = sum(s["total_impressions"] for s in summaries)
-        active_engs = [s["avg_engagement"] for s in summaries if s["avg_engagement"] > 0]
+        total_followers = sum(s["followers"] for s in active_summaries)
+        total_reach = sum(s["total_reach"] for s in active_summaries)
+        total_impressions = sum(s["total_impressions"] for s in active_summaries)
+        active_engs = [s["avg_engagement"] for s in active_summaries if s["avg_engagement"] > 0]
         avg_engagement = round(sum(active_engs) / len(active_engs), 2) if active_engs else 0.0
 
-        # 4. Filter & rank posts
+        # Filter & rank posts
         filtered_posts = AnalyticsEngine.filter_posts(
             posts_data=active_posts,
             platform=platform,
@@ -179,7 +216,7 @@ class AnalyticsService:
         total_likes = sum(p["metrics"]["likes"] for p in active_posts)
         total_comments = sum(p["metrics"]["comments"] for p in active_posts)
 
-        # 5. WoW comparison calculation
+        # WoW comparison calculation
         wow_comp = AnalyticsEngine.compare_weeks(
             current_week_metrics={
                 "reach": total_reach,
@@ -221,7 +258,7 @@ class AnalyticsService:
                 "total_comments": total_comments,
             },
             "wow_comparison": wow_comp,
-            "platforms": all_summaries,
+            "platforms": all_channel_summaries,
             "format_efficiency": format_breakdown,
             "posts": ranked_posts,
         }
@@ -235,8 +272,5 @@ class AnalyticsService:
 
     @classmethod
     async def get_analytics_for_ai_and_reports(cls, platform: str = "all", days: int = 7) -> Dict[str, Any]:
-        """
-        Convenience method to deliver exact synchronized data structures
-        to the AI Engine and Report Generators (PDF, Excel, PPTX, CSV).
-        """
+        """Convenience method for AI Engine and Report Generators."""
         return await cls.get_aggregated_data(platform=platform, days=days)
