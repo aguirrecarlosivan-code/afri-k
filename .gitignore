@@ -16,7 +16,11 @@ frontend/dist/
 frontend/build/
 .cache/
 
-# IDE / OS
+# Database files
+data/
+*.db
+*.sqlite
+*.sqlite3
 .vscode/
 .idea/
 .DS_Store

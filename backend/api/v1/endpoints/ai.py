@@ -1,9 +1,12 @@
+import logging
 from fastapi import APIRouter, Query, Body
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 from backend.ai.engine import AIEngine
-from backend.analytics.engine import AnalyticsEngine
 from backend.ai.predictive_engine import ContentPerformancePredictor
+from backend.services.analytics_service import AnalyticsService
+
+logger = logging.getLogger("radar.api.ai")
 
 router = APIRouter(prefix="/ai", tags=["AI Editorial Intelligence"])
 
@@ -11,34 +14,16 @@ router = APIRouter(prefix="/ai", tags=["AI Editorial Intelligence"])
 @router.post("/generate-summary")
 async def generate_ai_executive_summary() -> Dict[str, Any]:
     """
-    Trigger AI Editorial Analysis based strictly on stored database metrics.
+    Trigger AI Editorial Analysis based strictly on normalized AnalyticsService data.
     Generates: Resumen Ejecutivo, Fortalezas, Debilidades, Recomendaciones, and Hallazgos.
     """
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=7)
 
-    summaries = [
-        {"platform": "instagram", "followers": 89400, "total_reach": 158000, "total_impressions": 224000, "avg_engagement": 6.4},
-        {"platform": "youtube", "followers": 120500, "total_reach": 210000, "total_impressions": 380000, "avg_engagement": 8.2},
-        {"platform": "facebook", "followers": 45200, "total_reach": 68000, "total_impressions": 94000, "avg_engagement": 4.8},
-        {"platform": "tiktok", "followers": 154000, "total_reach": 340000, "total_impressions": 490000, "avg_engagement": 9.4},
-        {"platform": "x", "followers": 34200, "total_reach": 42000, "total_impressions": 65000, "avg_engagement": 5.1},
-    ]
-
-    top_posts = [
-        {
-            "id": "ig_media_201",
-            "platform": "instagram",
-            "type": "reel",
-            "text": "Cómo optimizar el alcance de tus contenidos con IA en 3 pasos 🔥",
-            "metrics": {"reach": 28900, "impressions": 41200, "likes": 1850, "comments": 210, "shares": 340},
-        }
-    ]
-
-    wow_comp = AnalyticsEngine.compare_weeks(
-        current_week_metrics={"reach": 818000, "impressions": 1253000, "engagement": 34800, "followers_gained": 1865, "posts_published": 18},
-        previous_week_metrics={"reach": 725000, "impressions": 1100000, "engagement": 31000, "followers_gained": 1500, "posts_published": 15},
-    )
+    analytics_data = await AnalyticsService.get_analytics_for_ai_and_reports(platform="all", days=7)
+    summaries = analytics_data.get("platforms", [])
+    top_posts = analytics_data.get("posts", [])
+    wow_comp = analytics_data.get("wow_comparison", {})
 
     engine = AIEngine()
     analysis = await engine.generate_executive_analysis(
@@ -47,6 +32,7 @@ async def generate_ai_executive_summary() -> Dict[str, Any]:
         platform_summaries=summaries,
         top_posts=top_posts,
         wow_comparison=wow_comp,
+        platform="all",
     )
 
     return {
@@ -65,32 +51,12 @@ async def get_deep_ai_analysis(
     Generate parametric Deep AI Analysis filtered by platform and date range.
     """
     end_date = datetime.utcnow()
-    start_date = end_date - timedelta(days=days)
+    start_date = end_date - timedelta(days=days or 7)
 
-    summaries = [
-        {"platform": "instagram", "followers": 89400, "total_reach": 158000, "total_impressions": 224000, "avg_engagement": 6.4},
-        {"platform": "youtube", "followers": 120500, "total_reach": 210000, "total_impressions": 380000, "avg_engagement": 8.2},
-        {"platform": "facebook", "followers": 45200, "total_reach": 68000, "total_impressions": 94000, "avg_engagement": 4.8},
-        {"platform": "tiktok", "followers": 154000, "total_reach": 340000, "total_impressions": 490000, "avg_engagement": 9.4},
-    ]
-
-    if platform != "all":
-        summaries = [s for s in summaries if s["platform"].lower() == platform.lower()]
-
-    top_posts = [
-        {
-            "id": "ig_media_201",
-            "platform": platform if platform != "all" else "instagram",
-            "type": "reel",
-            "text": "Cómo optimizar el alcance de tus contenidos con IA en 3 pasos 🔥",
-            "metrics": {"reach": 28900, "impressions": 41200, "likes": 1850, "comments": 210, "shares": 340},
-        }
-    ]
-
-    wow_comp = AnalyticsEngine.compare_weeks(
-        current_week_metrics={"reach": 818000, "impressions": 1253000, "engagement": 34800, "followers_gained": 1865, "posts_published": 18},
-        previous_week_metrics={"reach": 725000, "impressions": 1100000, "engagement": 31000, "followers_gained": 1500, "posts_published": 15},
-    )
+    analytics_data = await AnalyticsService.get_analytics_for_ai_and_reports(platform=platform or "all", days=days or 7)
+    summaries = analytics_data.get("platforms", [])
+    top_posts = analytics_data.get("posts", [])
+    wow_comp = analytics_data.get("wow_comparison", {})
 
     engine = AIEngine()
     analysis = await engine.generate_executive_analysis(
@@ -99,7 +65,7 @@ async def get_deep_ai_analysis(
         platform_summaries=summaries,
         top_posts=top_posts,
         wow_comparison=wow_comp,
-        platform=platform,
+        platform=platform or "all",
     )
 
     return {

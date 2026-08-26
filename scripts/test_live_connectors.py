@@ -14,7 +14,7 @@ from backend.connectors.tiktok.connector import TikTokConnector
 from backend.ai.engine import AIEngine
 
 
-async def test_live_all():
+async def run_live_connectors_check():
     print("=" * 60)
     print(" AFRI-K LIVE API CONNECTORS DIAGNOSTIC SUITE")
     print("=" * 60)
@@ -104,4 +104,4 @@ async def test_live_all():
 
 
 if __name__ == "__main__":
-    asyncio.run(test_live_all())
+    asyncio.run(run_live_connectors_check())

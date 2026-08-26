@@ -18,13 +18,12 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Initializing Afri-k Social Intelligence Backend Engine...")
 
-    # Create DB tables if DB is accessible
+    # Initialize database with auto-fallback
     try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database tables verified/created.")
+        from backend.database.session import init_db
+        await init_db()
     except Exception as e:
-        logger.warning(f"Database connection skipped or operating in resilient mode: {e}")
+        logger.warning(f"Database initialization notice: {e}")
 
     # Start APScheduler
     try:

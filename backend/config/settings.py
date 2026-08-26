@@ -11,13 +11,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "super-secret-radar-key"
 
-    # Database
-    POSTGRES_SERVER: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_USER: str = "radar_user"
-    POSTGRES_PASSWORD: str = "radar_password"
-    POSTGRES_DB: str = "radar_db"
-    DATABASE_URL: str = "postgresql+asyncpg://radar_user:radar_password@localhost:5432/radar_db"
+    # Database (defaults to embedded SQLite; PostgreSQL enabled via .env)
+    DATABASE_URL: str = "sqlite+aiosqlite:///./data/radar.db"
 
     # Redis
     REDIS_URL: Optional[str] = "redis://localhost:6379/0"

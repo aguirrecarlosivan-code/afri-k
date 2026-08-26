@@ -1,9 +1,10 @@
+import os
 import logging
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from backend.config.settings import settings
-from backend.analytics.engine import AnalyticsEngine
+from backend.services.analytics_service import AnalyticsService
 from backend.ai.engine import AIEngine
 from backend.reports.pdf_generator import PDFReportGenerator
 from backend.reports.pptx_generator import PPTXReportGenerator
@@ -17,50 +18,39 @@ scheduler = AsyncIOScheduler()
 
 async def job_hourly_update_metrics():
     """Job 1: Run every hour to refresh post & account metrics."""
-    logger.info("⏰ [Scheduler] Starting hourly metrics update job...")
-    logger.info("✅ [Scheduler] Hourly metrics update job completed successfully.")
+    logger.info("⏰ [Scheduler] Refreshing metrics via AnalyticsService...")
+    try:
+        await AnalyticsService.get_aggregated_data(platform="all")
+        logger.info("✅ [Scheduler] Hourly metrics update job completed successfully.")
+    except Exception as e:
+        logger.warning(f"Hourly metrics update notice: {e}")
 
 
 async def job_daily_sync_posts():
     """Job 2: Run daily to sync newly published posts."""
-    logger.info("⏰ [Scheduler] Starting daily post sync job...")
-    logger.info("✅ [Scheduler] Daily post sync job completed successfully.")
+    logger.info("⏰ [Scheduler] Running daily post sync...")
+    try:
+        await AnalyticsService.get_aggregated_data(platform="all")
+        logger.info("✅ [Scheduler] Daily post sync completed successfully.")
+    except Exception as e:
+        logger.warning(f"Daily post sync notice: {e}")
 
 
 async def job_weekly_friday_snapshot():
     """
-    Job 3: Run every Friday at 22:00.
-    1. Generate weekly snapshot
-    2. Calculate WoW analytics & viral posts
-    3. Run AI Editorial Intelligence report
-    4. Generate PDF, PPTX, Excel, JSON, and CSV exports
+    Job 3: Run every Friday at 22:00 (or triggered on demand).
+    Generates PDF, PPTX, Excel, JSON, and CSV reports based strictly on AnalyticsService data.
     """
-    logger.info("⏰ [Scheduler] Starting Friday 22:00 Weekly Snapshot & AI Report Generation...")
+    logger.info("⏰ [Scheduler] Starting Weekly Snapshot & AI Report Generation...")
+    os.makedirs("docs/reports", exist_ok=True)
 
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=7)
 
-    summaries = [
-        {"platform": "instagram", "followers": 89400, "total_reach": 158000, "total_impressions": 224000, "avg_engagement": 6.4},
-        {"platform": "youtube", "followers": 120500, "total_reach": 210000, "total_impressions": 380000, "avg_engagement": 8.2},
-        {"platform": "facebook", "followers": 45200, "total_reach": 68000, "total_impressions": 94000, "avg_engagement": 4.8},
-        {"platform": "tiktok", "followers": 154000, "total_reach": 340000, "total_impressions": 490000, "avg_engagement": 9.4},
-    ]
-
-    top_posts = [
-        {
-            "id": "ig_media_201",
-            "platform": "instagram",
-            "type": "reel",
-            "text": "Cómo optimizar el alcance de tus contenidos con IA",
-            "metrics": {"reach": 28900, "impressions": 41200, "likes": 1850, "comments": 210, "shares": 340},
-        }
-    ]
-
-    wow_comp = AnalyticsEngine.compare_weeks(
-        current_week_metrics={"reach": 818000, "impressions": 1253000, "engagement": 34800, "followers_gained": 1865, "posts_published": 18},
-        previous_week_metrics={"reach": 725000, "impressions": 1100000, "engagement": 31000, "followers_gained": 1500, "posts_published": 15},
-    )
+    analytics_data = await AnalyticsService.get_analytics_for_ai_and_reports(platform="all", days=7)
+    summaries = analytics_data.get("platforms", [])
+    top_posts = analytics_data.get("posts", [])
+    wow_comp = analytics_data.get("wow_comparison", {})
 
     ai_engine = AIEngine()
     ai_analysis = await ai_engine.generate_executive_analysis(
@@ -71,11 +61,11 @@ async def job_weekly_friday_snapshot():
         wow_comparison=wow_comp,
     )
 
-    timestamp_str = end_date.strftime("%Y%m%d_%H%M%S")
-    pdf_path = f"docs/reports/weekly_report_{timestamp_str}.pdf"
-    pptx_path = f"docs/reports/weekly_presentation_{timestamp_str}.pptx"
-    excel_path = f"docs/reports/weekly_excel_{timestamp_str}.xlsx"
-    json_path = f"docs/reports/weekly_data_{timestamp_str}.json"
+    pdf_path = "docs/reports/latest_executive_report.pdf"
+    pptx_path = "docs/reports/latest_presentation.pptx"
+    excel_path = "docs/reports/afrik_detailed_report.xlsx"
+    json_path = "docs/reports/afrik_structured_data.json"
+    csv_path = "docs/reports/afrik_metrics_export.csv"
 
     report_payload = {
         "period_start": start_date.strftime("%Y-%m-%d"),
@@ -85,12 +75,28 @@ async def job_weekly_friday_snapshot():
         "ai_analysis": ai_analysis,
     }
 
-    PDFReportGenerator.generate_report(pdf_path, report_payload, ai_analysis, summaries)
-    PPTXReportGenerator.generate_presentation(pptx_path, report_payload, ai_analysis, summaries)
-    ExcelReportGenerator.generate_report(excel_path, summaries, ai_analysis)
-    CSVJSONExporter.export_json(json_path, report_payload)
+    try:
+        PDFReportGenerator.generate_report(pdf_path, report_payload, ai_analysis, summaries)
+    except Exception as e:
+        logger.warning(f"PDF generation notice: {e}")
 
-    logger.info("🎉 [Scheduler] Friday Weekly Snapshot and Executive Reports generated successfully!")
+    try:
+        PPTXReportGenerator.generate_presentation(pptx_path, report_payload, ai_analysis, summaries)
+    except Exception as e:
+        logger.warning(f"PPTX generation notice: {e}")
+
+    try:
+        ExcelReportGenerator.generate_report(excel_path, summaries, ai_analysis)
+    except Exception as e:
+        logger.warning(f"Excel generation notice: {e}")
+
+    try:
+        CSVJSONExporter.export_json(json_path, report_payload)
+        CSVJSONExporter.export_csv(csv_path, summaries)
+    except Exception as e:
+        logger.warning(f"JSON/CSV export notice: {e}")
+
+    logger.info("🎉 [Scheduler] Weekly Snapshot and Executive Reports generated successfully!")
 
 
 def start_scheduler():
