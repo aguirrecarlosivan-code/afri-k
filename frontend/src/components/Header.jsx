@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Radio, Download, RefreshCw, Layers, Clock, ShieldCheck, Key } from 'lucide-react';
+import { Radio, Download, RefreshCw, Layers, Clock, ShieldCheck, Key, FileSpreadsheet } from 'lucide-react';
 
-export default function Header({ onTriggerAI, onOpenExport, onOpenConnector, isSyncing, lastUpdated }) {
+export default function Header({ onTriggerAI, onOpenExport, onOpenConnector, onOpenMetaImport, isSyncing, lastUpdated }) {
   const [connectors, setConnectors] = useState([
     { platform: 'facebook', name: 'FB', connected: true },
     { platform: 'instagram', name: 'IG', connected: true },
@@ -68,6 +68,15 @@ export default function Header({ onTriggerAI, onOpenExport, onOpenConnector, isS
             <span>Última actualización:</span>
             <span className="text-slate-200 font-semibold">{lastUpdated || 'En vivo'}</span>
           </div>
+
+          <button
+            onClick={onOpenMetaImport}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition-all shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40"
+            title="Importar reporte oficial CSV / Excel de Meta Business Suite"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Importar Meta Suite</span>
+          </button>
 
           <button
             onClick={onTriggerAI}

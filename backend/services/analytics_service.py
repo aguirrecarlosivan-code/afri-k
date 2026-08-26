@@ -213,16 +213,18 @@ class AnalyticsService:
             force_refresh=force_refresh,
         )
 
-        # Combined pool of real posts for the window
-        all_real_posts = live_fb_posts + live_ig_posts
+        from backend.services.meta_suite_importer import IMPORTED_META_SUITE_POSTS
+
+        # Combined pool of real posts (API + Imported Meta Suite)
+        all_real_posts = (IMPORTED_META_SUITE_POSTS if IMPORTED_META_SUITE_POSTS else []) + live_fb_posts + live_ig_posts
 
         # Filter by platform
         if sel_plat == "all":
             platform_pool = all_real_posts
         elif sel_plat == "facebook":
-            platform_pool = live_fb_posts
+            platform_pool = [p for p in all_real_posts if p["platform"] == "facebook"]
         elif sel_plat == "instagram":
-            platform_pool = live_ig_posts
+            platform_pool = [p for p in all_real_posts if p["platform"] == "instagram"]
         else:
             platform_pool = []
 
@@ -360,14 +362,19 @@ class AnalyticsService:
             end_dt=end_dt,
         )
 
+        from backend.services.meta_suite_importer import IMPORTED_META_SUITE_POSTS
+
+        fb_pool = [p for p in IMPORTED_META_SUITE_POSTS if p["platform"] == "facebook"] + live_fb_posts
+        ig_pool = [p for p in IMPORTED_META_SUITE_POSTS if p["platform"] == "instagram"] + live_ig_posts
+
         fb_top_5 = sorted(
-            live_fb_posts,
+            fb_pool,
             key=lambda x: (x.get("metrics", {}).get("likes", 0), x.get("metrics", {}).get("comments", 0), x.get("metrics", {}).get("shares", 0)),
             reverse=True,
         )[:5]
 
         ig_top_5 = sorted(
-            live_ig_posts,
+            ig_pool,
             key=lambda x: (x.get("metrics", {}).get("likes", 0), x.get("metrics", {}).get("comments", 0)),
             reverse=True,
         )[:5]

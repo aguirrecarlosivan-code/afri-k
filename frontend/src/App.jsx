@@ -12,6 +12,7 @@ import YearlyTopPostsLeaderboard from './components/YearlyTopPostsLeaderboard';
 import AIExecutiveSummaryCard from './components/AIExecutiveSummaryCard';
 import ReportExportModal from './components/ReportExportModal';
 import AccountConnectorModal from './components/AccountConnectorModal';
+import MetaSuiteImportModal from './components/MetaSuiteImportModal';
 import DateRangeFilter from './components/DateRangeFilter';
 import PlatformTabs from './components/PlatformTabs';
 import { Users, Eye, Zap, Activity, Video, Clock, Share2 } from 'lucide-react';
@@ -24,6 +25,7 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isConnectorOpen, setIsConnectorOpen] = useState(false);
+  const [isMetaImportOpen, setIsMetaImportOpen] = useState(false);
   const [connectorPlatform, setConnectorPlatform] = useState('facebook');
   const [lastUpdated, setLastUpdated] = useState('');
 
@@ -151,6 +153,7 @@ export default function App() {
         onTriggerAI={handleTriggerAI}
         onOpenExport={() => setIsExportOpen(true)}
         onOpenConnector={handleOpenConnector}
+        onOpenMetaImport={() => setIsMetaImportOpen(true)}
         isSyncing={isSyncing}
         lastUpdated={lastUpdated}
       />
@@ -274,6 +277,19 @@ export default function App() {
         onClose={() => setIsConnectorOpen(false)}
         defaultPlatform={connectorPlatform}
         onCredentialsSaved={() => fetchData()}
+      />
+      <MetaSuiteImportModal
+        isOpen={isMetaImportOpen}
+        onClose={() => setIsMetaImportOpen(false)}
+        onImportSuccess={() => {
+          fetchData();
+          fetch('/api/v1/analytics/top-yearly-posts')
+            .then((r) => r.json())
+            .then((res) => {
+              if (res) setYearlyTopPosts(res);
+            })
+            .catch(() => {});
+        }}
       />
     </div>
   );

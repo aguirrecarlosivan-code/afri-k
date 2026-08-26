@@ -1,7 +1,8 @@
 import logging
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, UploadFile, File, HTTPException
 from backend.services.analytics_service import AnalyticsService
+from backend.services.meta_suite_importer import MetaSuiteImporter
 
 logger = logging.getLogger("radar.api.analytics")
 
@@ -52,3 +53,32 @@ async def get_top_yearly_posts(
 ) -> Dict[str, Any]:
     """Returns the top 5 most-liked publications of the entire year for Facebook and Instagram."""
     return await AnalyticsService.get_yearly_top_posts(year=year)
+
+
+@router.post("/import-meta-suite")
+async def import_meta_business_suite_file(
+    file: UploadFile = File(...),
+) -> Dict[str, Any]:
+    """
+    Ingests and parses official Meta Business Suite export files (CSV or Excel).
+    Instantly populates dashboard with authentic Content Library data.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No se proporcionó ningún archivo.")
+
+    contents = await file.read()
+    try:
+        posts = MetaSuiteImporter.parse_file(file.filename, contents)
+        return {
+            "status": "success",
+            "message": f"Se importaron con éxito {len(posts)} publicaciones de Meta Business Suite.",
+            "filename": file.filename,
+            "total_posts": len(posts),
+            "total_views": sum(p["metrics"]["views"] for p in posts),
+            "total_reach": sum(p["metrics"]["reach"] for p in posts),
+            "total_interactions": sum(p["metrics"]["total_interactions"] for p in posts),
+        }
+    except Exception as e:
+        logger.error(f"Error parsing Meta Suite file: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
