@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ThumbsUp, MessageSquare, Share2, Eye, ExternalLink, Filter, ArrowUpDown, AlertCircle, Award } from 'lucide-react';
+import { ThumbsUp, MessageSquare, Share2, ExternalLink, Filter, ArrowUpDown, AlertCircle, Award } from 'lucide-react';
 
 export default function TopPostsTable({ posts = [] }) {
   const [selectedFormat, setSelectedFormat] = useState('all');
@@ -31,7 +31,7 @@ export default function TopPostsTable({ posts = [] }) {
     return (p.type || '').toLowerCase() === selectedFormat.toLowerCase();
   });
 
-  // Sort posts primarily by Likes, then Comments, then Shares, then Reach
+  // Sort posts primarily by Likes, then Comments, then Shares
   const sortedPosts = [...filteredPosts].sort((a, b) => {
     const aLikes = a.metrics?.likes || 0;
     const bLikes = b.metrics?.likes || 0;
@@ -39,27 +39,19 @@ export default function TopPostsTable({ posts = [] }) {
     const bComments = b.metrics?.comments || 0;
     const aShares = a.metrics?.shares || 0;
     const bShares = b.metrics?.shares || 0;
-    const aReach = a.metrics?.reach || 0;
-    const bReach = b.metrics?.reach || 0;
 
     if (sortBy === 'likes') {
       if (bLikes !== aLikes) return bLikes - aLikes;
       if (bComments !== aComments) return bComments - aComments;
-      if (bShares !== aShares) return bShares - aShares;
-      return bReach - aReach;
+      return bShares - aShares;
     } else if (sortBy === 'comments') {
       if (bComments !== aComments) return bComments - aComments;
       if (bLikes !== aLikes) return bLikes - aLikes;
-      if (bShares !== aShares) return bShares - aShares;
-      return bReach - aReach;
+      return bShares - aShares;
     } else if (sortBy === 'shares') {
       if (bShares !== aShares) return bShares - aShares;
       if (bLikes !== aLikes) return bLikes - aLikes;
-      if (bComments !== aComments) return bComments - aComments;
-      return bReach - aReach;
-    } else if (sortBy === 'reach') {
-      if (bReach !== aReach) return bReach - aReach;
-      return bLikes - aLikes;
+      return bComments - aComments;
     }
     return 0;
   });
@@ -70,10 +62,10 @@ export default function TopPostsTable({ posts = [] }) {
         <div>
           <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
             <Award className="w-5 h-5 text-amber-400" />
-            Top Publicaciones con Mayor Interacción
+            Top Publicaciones con Mayor Interacción Real
           </h3>
           <p className="text-xs text-slate-400">
-            Publicaciones reales ordenadas por Reacciones (Likes), Comentarios y Compartidos
+            Publicaciones oficiales ordenadas por Reacciones (Likes), Comentarios y Veces Compartidas
           </p>
         </div>
 
@@ -90,7 +82,6 @@ export default function TopPostsTable({ posts = [] }) {
               <option value="all">Todos los Formatos</option>
               <option value="reel">Reels</option>
               <option value="video">Videos</option>
-              <option value="short">Shorts</option>
               <option value="post">Posts Estáticos</option>
             </select>
           </div>
@@ -103,10 +94,9 @@ export default function TopPostsTable({ posts = [] }) {
               onChange={(e) => setSortBy(e.target.value)}
               className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer"
             >
-              <option value="likes">Más Likes / Reacciones</option>
+              <option value="likes">Más Reacciones (Likes)</option>
               <option value="comments">Más Comentadas</option>
               <option value="shares">Más Compartidas</option>
-              <option value="reach">Mayor Alcance (Views)</option>
             </select>
           </div>
         </div>
@@ -115,8 +105,8 @@ export default function TopPostsTable({ posts = [] }) {
       {sortedPosts.length === 0 ? (
         <div className="p-8 text-center bg-slate-900/40 rounded-xl border border-slate-800/80 my-4">
           <AlertCircle className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-300">No hay publicaciones disponibles para los filtros seleccionados</p>
-          <p className="text-xs text-slate-500 mt-1">Las redes sociales sin API vinculada o sin actividad reciente no mostrarán datos simulados.</p>
+          <p className="text-sm font-semibold text-slate-300">No hay publicaciones disponibles para este período</p>
+          <p className="text-xs text-slate-500 mt-1">Selecciona otro mes o trimestre para explorar contenidos históricos.</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -124,11 +114,12 @@ export default function TopPostsTable({ posts = [] }) {
             <thead className="bg-slate-900/60 text-xs uppercase text-slate-400 border-b border-slate-800">
               <tr>
                 <th className="py-3 px-3 text-center">#</th>
-                <th className="py-3 px-4">Canal</th>
-                <th className="py-3 px-4">Formato</th>
+                <th className="py-3 px-3">Canal</th>
+                <th className="py-3 px-3">Formato</th>
                 <th className="py-3 px-4">Contenido / Titular Real</th>
-                <th className="py-3 px-4">Alcance Real</th>
-                <th className="py-3 px-4">Desglose (Likes / Comentarios / Shares)</th>
+                <th className="py-3 px-4 text-center">Reacciones (Likes)</th>
+                <th className="py-3 px-4 text-center">Comentarios</th>
+                <th className="py-3 px-4 text-center">Compartidos</th>
                 <th className="py-3 px-4 text-center">Total Interacciones</th>
                 <th className="py-3 px-4 text-right">Enlace Directo</th>
               </tr>
@@ -149,13 +140,13 @@ export default function TopPostsTable({ posts = [] }) {
                        <span>#{idx + 1}</span>}
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap">
+                    <td className="py-3.5 px-3 whitespace-nowrap">
                       <span className={`px-2.5 py-1 text-xs font-bold rounded-lg border uppercase ${getPlatformBadge(post.platform)}`}>
                         {post.platform}
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap">
+                    <td className="py-3.5 px-3 whitespace-nowrap">
                       <span className="px-2 py-0.5 text-[11px] font-semibold bg-slate-800 text-slate-300 rounded-md capitalize">
                         {post.type}
                       </span>
@@ -167,30 +158,27 @@ export default function TopPostsTable({ posts = [] }) {
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-slate-300 text-xs font-bold">
-                        <Eye className="w-4 h-4 text-slate-400" />
-                        <span>{(post.metrics?.reach || 0).toLocaleString()}</span>
-                      </div>
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 text-emerald-400 font-bold bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-500/20 text-xs">
+                        <ThumbsUp className="w-3.5 h-3.5" /> {(post.metrics?.likes || 0).toLocaleString()}
+                      </span>
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3 text-xs">
-                        <span className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20" title="Likes / Reacciones">
-                          <ThumbsUp className="w-3.5 h-3.5" /> {(post.metrics?.likes || 0).toLocaleString()}
-                        </span>
-                        <span className="flex items-center gap-1 text-cyan-400 font-bold bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20" title="Comentarios">
-                          <MessageSquare className="w-3.5 h-3.5" /> {(post.metrics?.comments || 0).toLocaleString()}
-                        </span>
-                        <span className="flex items-center gap-1 text-purple-400 font-bold bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-500/20" title="Compartidos">
-                          <Share2 className="w-3.5 h-3.5" /> {(post.metrics?.shares || 0).toLocaleString()}
-                        </span>
-                      </div>
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 text-cyan-400 font-bold bg-cyan-950/40 px-2.5 py-1 rounded-lg border border-cyan-500/20 text-xs">
+                        <MessageSquare className="w-3.5 h-3.5" /> {(post.metrics?.comments || 0).toLocaleString()}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 text-purple-400 font-bold bg-purple-950/40 px-2.5 py-1 rounded-lg border border-purple-500/20 text-xs">
+                        <Share2 className="w-3.5 h-3.5" /> {(post.metrics?.shares || 0).toLocaleString()}
+                      </span>
                     </td>
 
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-gradient-to-r from-emerald-950 to-indigo-950 text-emerald-300 border border-emerald-500/40 shadow-sm">
-                        ⚡ {totalActions.toLocaleString()} acciones
+                        ⚡ {totalActions.toLocaleString()}
                       </span>
                     </td>
 
@@ -199,10 +187,10 @@ export default function TopPostsTable({ posts = [] }) {
                         href={displayUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 hover:text-blue-200 border border-blue-500/40 inline-flex items-center gap-1.5 text-xs font-bold transition-all"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 hover:text-indigo-200 border border-indigo-500/40 text-xs font-bold transition-all shadow-sm group"
                       >
                         <span>{buttonLabel}</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        <ExternalLink className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                       </a>
                     </td>
                   </tr>
