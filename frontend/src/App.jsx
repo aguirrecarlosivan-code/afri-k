@@ -201,6 +201,16 @@ export default function App() {
           />
         </section>
 
+        {/* Detailed API Metrics Matrix Across All Networks */}
+        <section>
+          <PlatformDeepMetricsMatrix
+            platforms={data?.platforms || []}
+            onOpenConnector={handleOpenConnector}
+            onSelectPlatform={setSelectedPlatform}
+            selectedPlatform={selectedPlatform}
+          />
+        </section>
+
         {/* AI Executive Intelligence Report Card */}
         <section>
           <AIExecutiveSummaryCard aiReport={aiReport} />
@@ -223,16 +233,6 @@ export default function App() {
           <div className="grid grid-cols-1 gap-8">
             <PlatformReachShareChart platforms={data?.platforms || []} />
           </div>
-        </section>
-
-        {/* Detailed API Metrics Matrix Across All Networks */}
-        <section>
-          <PlatformDeepMetricsMatrix
-            platforms={data?.platforms || []}
-            onOpenConnector={handleOpenConnector}
-            onSelectPlatform={setSelectedPlatform}
-            selectedPlatform={selectedPlatform}
-          />
         </section>
 
         {/* Top Posts Table - ONLY real data from APIs, no mock fallback */}
