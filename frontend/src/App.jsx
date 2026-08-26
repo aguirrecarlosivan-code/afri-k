@@ -47,6 +47,16 @@ export default function App() {
     fetchData();
   }, [selectedDays, selectedPlatform, customDates]);
 
+  useEffect(() => {
+    // Initial AI Summary fetch once on mount
+    fetch('/api/v1/ai/generate-summary', { method: 'POST' })
+      .then((r) => r.json())
+      .then((resAI) => {
+        if (resAI && resAI.ai_report) setAiReport(resAI.ai_report);
+      })
+      .catch((e) => console.log('AI background summary fetch notice:', e));
+  }, []);
+
   const fetchData = async (retryCount = 0) => {
     try {
       let queryUrl = `/api/v1/analytics/filtered?platform=${selectedPlatform}`;
@@ -56,15 +66,13 @@ export default function App() {
         queryUrl += `&days=${selectedDays}`;
       }
 
-      const [resFiltered, resHeatmap, resAI] = await Promise.all([
+      const [resFiltered, resHeatmap] = await Promise.all([
         fetch(queryUrl).then((r) => r.json()),
         fetch('/api/v1/analytics/posting-heatmap').then((r) => r.json()),
-        fetch('/api/v1/ai/generate-summary', { method: 'POST' }).then((r) => r.json()),
       ]);
 
       setData(resFiltered);
       setHeatmap(resHeatmap);
-      if (resAI && resAI.ai_report) setAiReport(resAI.ai_report);
       updateTimestamp(resFiltered?.last_updated_at);
     } catch (err) {
       console.log(`Backend not available (attempt ${retryCount + 1}/5) - retrying in 3s...`);
