@@ -203,9 +203,15 @@ export default function TopPostsTable({ posts = [] }) {
                       </td>
 
                       <td className="py-3 px-3 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 text-cyan-400 font-bold bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20">
-                          <Eye className="w-3 h-3" /> {(post.metrics?.views || post.metrics?.impressions || 0).toLocaleString()}
-                        </span>
+                        {(post.metrics?.views || post.metrics?.impressions || 0) > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-cyan-400 font-bold bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                            <Eye className="w-3 h-3" /> {(post.metrics?.views || post.metrics?.impressions).toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-slate-500 italic text-[11px]" title="Telemetría de visualizaciones disponible al exportar el reporte oficial de Meta Suite">
+                            -- (Meta Suite)
+                          </span>
+                        )}
                       </td>
 
                       <td className="py-3 px-3 text-center whitespace-nowrap">
