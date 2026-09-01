@@ -156,6 +156,7 @@ export default function App() {
         onOpenMetaImport={() => setIsMetaImportOpen(true)}
         isSyncing={isSyncing}
         lastUpdated={lastUpdated}
+        databaseCount={data?.database_stats?.total_stored_posts || 0}
       />
 
       <main className="max-w-7xl mx-auto px-6 pt-8 space-y-8">

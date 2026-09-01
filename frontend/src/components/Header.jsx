@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Radio, Download, RefreshCw, Layers, Clock, ShieldCheck, Key, FileSpreadsheet } from 'lucide-react';
+import { Radio, Download, RefreshCw, Layers, Clock, ShieldCheck, Key, FileSpreadsheet, Database } from 'lucide-react';
 
-export default function Header({ onTriggerAI, onOpenExport, onOpenConnector, onOpenMetaImport, isSyncing, lastUpdated }) {
+export default function Header({ onTriggerAI, onOpenExport, onOpenConnector, onOpenMetaImport, isSyncing, lastUpdated, databaseCount = 0 }) {
   const [connectors, setConnectors] = useState([
     { platform: 'facebook', name: 'FB', connected: true },
     { platform: 'instagram', name: 'IG', connected: true },
@@ -62,6 +62,17 @@ export default function Header({ onTriggerAI, onOpenExport, onOpenConnector, onO
 
         {/* Action Buttons & Last Updated Timestamp */}
         <div className="flex items-center gap-3">
+          {/* Meta Reports Database Status Pill */}
+          <div
+            onClick={onOpenMetaImport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/40 text-xs cursor-pointer transition-all"
+            title="Haz clic para importar o ver el estado del repositorio de Meta Suite"
+          >
+            <Database className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-slate-400">Base Meta:</span>
+            <span className="text-emerald-400 font-bold">{databaseCount > 0 ? `${databaseCount} posts` : 'Híbrida'}</span>
+          </div>
+
           {/* Last Updated Timestamp Badge */}
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-400">
             <Clock className="w-3.5 h-3.5 text-indigo-400" />
